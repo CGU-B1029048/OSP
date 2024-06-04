@@ -9,7 +9,7 @@
 *                                               EXAMPLE #2
 *********************************************************************************************************
 */
-
+#include <stdio.h>
 #include "includes.h"
 
 /*
@@ -36,6 +36,17 @@
 #define          TASK_4_PRIO        15
 #define          TASK_5_PRIO        16
 
+
+#define		PERIODIC_TASK_START_ID	20
+#define		PERIODIC_TASK_START_PRIO 20
+
+typedef struct {
+	INT32U RemainTime;
+	INT32U ExecutionTime;
+	INT32U Period;
+	INT32U Deadline;
+}TASK_EXTRA_DATA;
+
 /*
 *********************************************************************************************************
 *                                              VARIABLES
@@ -52,6 +63,15 @@ OS_STK        Task5Stk[TASK_STK_SIZE];                /* Task #5    task stack  
 
 OS_EVENT     *AckMbox;                                /* Message mailboxes for Tasks #4 and #5         */
 OS_EVENT     *TxMbox;
+
+OS_STK TaskStk[8][TASK_STK_SIZE];
+TASK_EXTRA_DATA TaskExtraData[8];
+INT8U NumberOfTasks;
+INT8U ExecutionTime[8];
+INT8U PeriodTime[8];
+INT32U MyStartTime;
+
+INT8U *TaskOrder;
 
 /*
 *********************************************************************************************************
@@ -70,6 +90,8 @@ static  void  TaskStartDisp(void);
         void  Task4(void *data);
         void  Task5(void *data);
 
+	void  PeriodicTask(void*data);
+
 /*$PAGE*/
 /*
 *********************************************************************************************************
@@ -77,12 +99,57 @@ static  void  TaskStartDisp(void);
 *********************************************************************************************************
 */
 
+void BubbleSort(TASK_EXTRA_DATA *array, int *order, int Num_of_Tasks) {
+    int i, j, ttmmpp;
+    for (i = 0; i <= Num_of_Tasks; i++) {
+        for (j = i; j < Num_of_Tasks; j++) {
+            if (array[i].Period > array[j].Period) {
+                TASK_EXTRA_DATA tmp = array[i];
+                array[i] = array [j];
+                array[j] = tmp;
+                ttmmpp = order[i];
+                order[i] = order[j];
+                order[j] = ttmmpp;
+            }
+        }
+    }
+}
+
+void InsertExePeriodTime(INT8U *Exe, INT8U *per, int Num_of_Tasks) {
+    int i;
+    for (i = 0; i < Num_of_Tasks; i++) {
+        Exe[TaskOrder[i]] = TaskExtraData[TaskOrder[i]].ExecutionTime / OS_TICKS_PER_SEC;
+        per[TaskOrder[i]] = TaskExtraData[TaskOrder[i]].Period / OS_TICKS_PER_SEC;
+    }
+}
+
 void main (void)
 {
     OS_STK *ptos;
     OS_STK *pbos;
     INT32U  size;
 
+	FILE *InputFile;
+	INT8U i;
+	InputFile = fopen("Input.txt","r");
+	fscanf(InputFile,"%d", &NumberOfTasks);
+    TaskOrder = (int *)malloc(sizeof(int) * NumberOfTasks);
+	
+	for(i=0; i<NumberOfTasks;i++)
+	{
+		fscanf(InputFile,"%d%d",&ExecutionTime[i],&PeriodTime[i]);
+			TaskExtraData[i].ExecutionTime = ExecutionTime[i] * OS_TICKS_PER_SEC;
+			TaskExtraData[i].Period = PeriodTime[i]* OS_TICKS_PER_SEC;
+			TaskExtraData[i].Deadline = PeriodTime[i] * OS_TICKS_PER_SEC;
+			TaskExtraData[i].RemainTime = ExecutionTime[i] * OS_TICKS_PER_SEC;
+            TaskOrder[i] = i;
+	}
+	fclose(InputFile);
+
+    BubbleSort(TaskExtraData, TaskOrder, NumberOfTasks);
+    InsertExePeriodTime(ExecutionTime, PeriodTime, NumberOfTasks);
+    // BubbleSortINT8(ExecutionTime, NumberOfTasks);
+    // BubbleSortINT8(PeriodTime, NumberOfTasks);
 
     PC_DispClrScr(DISP_FGND_WHITE);                        /* Clear the screen                         */
 
@@ -160,37 +227,34 @@ void  TaskStart (void *pdata)
 *********************************************************************************************************
 */
 
-static  void  TaskStartDispInit (void)
-{
-/*                                1111111111222222222233333333334444444444555555555566666666667777777777 */
-/*                      01234567890123456789012345678901234567890123456789012345678901234567890123456789 */
-    PC_DispStr( 0,  0, "                         uC/OS-II, The Real-Time Kernel                         ", DISP_FGND_WHITE + DISP_BGND_RED + DISP_BLINK);
-    PC_DispStr( 0,  1, "                                Jean J. Labrosse                                ", DISP_FGND_BLACK + DISP_BGND_LIGHT_GRAY);
+static  void  TaskStartDispInit (void) {
+    char s[80];
+    INT8U i;
+    INT8U j;
+
+    PC_DispStr( 0,  0, "                         Final Project on uC/OS-II                              ", DISP_FGND_WHITE + DISP_BGND_RED + DISP_BLINK);
+    PC_DispStr( 0,  1, "                                B1000000                                        ", DISP_FGND_BLACK + DISP_BGND_LIGHT_GRAY);
     PC_DispStr( 0,  2, "                                                                                ", DISP_FGND_BLACK + DISP_BGND_LIGHT_GRAY);
-    PC_DispStr( 0,  3, "                                    EXAMPLE #2                                  ", DISP_FGND_BLACK + DISP_BGND_LIGHT_GRAY);
+    PC_DispStr( 0,  3, "                             Scheduling Result                                  ", DISP_FGND_BLACK + DISP_BGND_LIGHT_GRAY);
     PC_DispStr( 0,  4, "                                                                                ", DISP_FGND_BLACK + DISP_BGND_LIGHT_GRAY);
     PC_DispStr( 0,  5, "                                                                                ", DISP_FGND_BLACK + DISP_BGND_LIGHT_GRAY);
     PC_DispStr( 0,  6, "                                                                                ", DISP_FGND_BLACK + DISP_BGND_LIGHT_GRAY);
     PC_DispStr( 0,  7, "                                                                                ", DISP_FGND_BLACK + DISP_BGND_LIGHT_GRAY);
-    PC_DispStr( 0,  8, "                                                                                ", DISP_FGND_BLACK + DISP_BGND_LIGHT_GRAY);
-    PC_DispStr( 0,  9, "Task           Total Stack  Free Stack  Used Stack  ExecTime (uS)               ", DISP_FGND_BLACK + DISP_BGND_LIGHT_GRAY);
-    PC_DispStr( 0, 10, "-------------  -----------  ----------  ----------  -------------               ", DISP_FGND_BLACK + DISP_BGND_LIGHT_GRAY);
-    PC_DispStr( 0, 11, "                                                                                ", DISP_FGND_BLACK + DISP_BGND_LIGHT_GRAY);
-    PC_DispStr( 0, 12, "TaskStart():                                                                    ", DISP_FGND_BLACK + DISP_BGND_LIGHT_GRAY);
-    PC_DispStr( 0, 13, "TaskClk()  :                                                                    ", DISP_FGND_BLACK + DISP_BGND_LIGHT_GRAY);
-    PC_DispStr( 0, 14, "Task1()    :                                                                    ", DISP_FGND_BLACK + DISP_BGND_LIGHT_GRAY);
-    PC_DispStr( 0, 15, "Task2()    :                                                                    ", DISP_FGND_BLACK + DISP_BGND_LIGHT_GRAY);
-    PC_DispStr( 0, 16, "Task3()    :                                                                    ", DISP_FGND_BLACK + DISP_BGND_LIGHT_GRAY);
-    PC_DispStr( 0, 17, "Task4()    :                                                                    ", DISP_FGND_BLACK + DISP_BGND_LIGHT_GRAY);
-    PC_DispStr( 0, 18, "Task5()    :                                                                    ", DISP_FGND_BLACK + DISP_BGND_LIGHT_GRAY);
-    PC_DispStr( 0, 19, "                                                                                ", DISP_FGND_BLACK + DISP_BGND_LIGHT_GRAY);
-    PC_DispStr( 0, 20, "                                                                                ", DISP_FGND_BLACK + DISP_BGND_LIGHT_GRAY);
-    PC_DispStr( 0, 21, "                                                                                ", DISP_FGND_BLACK + DISP_BGND_LIGHT_GRAY);
-    PC_DispStr( 0, 22, "#Tasks          :        CPU Usage:     %                                       ", DISP_FGND_BLACK + DISP_BGND_LIGHT_GRAY);
-    PC_DispStr( 0, 23, "#Task switch/sec:                                                               ", DISP_FGND_BLACK + DISP_BGND_LIGHT_GRAY);
-    PC_DispStr( 0, 24, "                            <-PRESS 'ESC' TO QUIT->                             ", DISP_FGND_BLACK + DISP_BGND_LIGHT_GRAY + DISP_BLINK);
-/*                                1111111111222222222233333333334444444444555555555566666666667777777777 */
-/*                      01234567890123456789012345678901234567890123456789012345678901234567890123456789 */
+    PC_DispStr( 0,  8, "Task         Start Time   End Time     Deadline    Period    Execution      Run ", DISP_FGND_BLACK + DISP_BGND_LIGHT_GRAY);
+    PC_DispStr( 0,  9, "-----------  -----------  ----------  ----------  -------    ---------      --- ", DISP_FGND_BLACK + DISP_BGND_LIGHT_GRAY);
+    for(i=0; i< NumberOfTasks; i++)
+    {
+      sprintf(s,"Task%1d()    :                                         %2d       %2d                ",i+1,PeriodTime[i],ExecutionTime[i]);
+      PC_DispStr(0, 10+i, s,DISP_FGND_BLACK+DISP_BGND_LIGHT_GRAY);
+    }
+    for(j=(NumberOfTasks+10);j<22;j++)
+    {
+      PC_DispStr( 0, j,"                                                                                 ",DISP_FGND_BLACK+DISP_BGND_LIGHT_GRAY);
+    }
+    PC_DispStr( 0, 22,"#Tasks         :           CPU Usage:    %                                   ",DISP_FGND_BLACK+DISP_BGND_LIGHT_GRAY);
+    PC_DispStr( 0, 23,"#Task switch/sec:                                                            ",DISP_FGND_BLACK+DISP_BGND_LIGHT_GRAY);
+    PC_DispStr( 0, 24,"                              <-PRESS 'ESC' TO QUIT->                        ", DISP_FGND_BLACK + DISP_BGND_LIGHT_GRAY + DISP_BLINK);
+	
 }
 
 /*$PAGE*/
@@ -242,7 +306,7 @@ static  void  TaskStartDisp (void)
 *                                             CREATE TASKS
 *********************************************************************************************************
 */
-
+/*
 static  void  TaskStartCreateTasks (void)
 {
     OSTaskCreateExt(TaskClk,
@@ -304,6 +368,38 @@ static  void  TaskStartCreateTasks (void)
                    TASK_STK_SIZE,
                    (void *)0,
                    OS_TASK_OPT_STK_CHK | OS_TASK_OPT_STK_CLR);
+}
+*/
+
+static void TaskStartCreateTasks(void)
+{
+	INT8U i;
+	char s[80];
+	MyStartTime = OSTimeGet();
+
+    OSTaskCreateExt(TaskClk,
+                    (void *)0,
+                    &TaskClkStk[TASK_STK_SIZE-1],
+                    TASK_CLK_PRIO,
+                    TASK_CLK_ID,
+                    &TaskClkStk[0],
+                    TASK_STK_SIZE,
+                    (void*)0,
+	                OS_TASK_OPT_STK_CHK | OS_TASK_OPT_STK_CLR
+    );
+
+     for(i=0; i<NumberOfTasks; i++)
+     {
+      OSTaskCreateExt(PeriodicTask,
+                    (void *)0,
+                    &TaskStk[i][TASK_STK_SIZE-1],
+                    (PERIODIC_TASK_START_PRIO + i),
+                    (PERIODIC_TASK_START_ID + i),
+                    &TaskStk[i][0],
+                    TASK_STK_SIZE,
+                    &TaskExtraData[i],
+                    OS_TASK_OPT_STK_CHK | OS_TASK_OPT_STK_CLR);
+     }
 }
 
 /*$PAGE*/
@@ -471,3 +567,60 @@ void  TaskClk (void *data)
     }
 }
 
+
+void PeriodicTask(void *pdata)
+{
+	INT8U x;
+    INT8U task_disp_y, task_disp_x;
+	TASK_EXTRA_DATA *MyPtr;
+	char s[34];
+	char p[34];
+	INT8U i;
+	INT32U TaskTime;
+
+	pdata=pdata;
+	MyPtr = OSTCBCur->OSTCBExtPtr;
+	x=0;
+    task_disp_x = 2;
+    task_disp_y = 15;
+
+	MyPtr->Deadline = MyStartTime + MyPtr->Period;
+	MyPtr->RemainTime = MyPtr->ExecutionTime;
+	for (;;) {
+        // Display the task execution order
+        sprintf(s, "%d->", TaskOrder[OSPrioCur - PERIODIC_TASK_START_PRIO]+1); //Get the current exeution task ID
+        PC_DispStr(task_disp_x, task_disp_y, s, DISP_FGND_BLACK + DISP_BGND_LIGHT_GRAY);
+        task_disp_x += 3; // change line if reach edge (80)
+        if (task_disp_x > 77) {
+            task_disp_x = 2;
+            task_disp_y++;
+        }
+        // Display content switch time
+        sprintf(s, "switch at %10d",OSTimeGet()/OS_TICKS_PER_SEC-1);
+        PC_DispStr( 0,  20, s, DISP_FGND_BLACK + DISP_BGND_LIGHT_GRAY);
+
+        // Display Task Info
+		x++;
+		sprintf(s,"%4d",x); // Display Execution Count
+	PC_DispStr(75,10 + TaskOrder[OSPrioCur - PERIODIC_TASK_START_PRIO],s,DISP_FGND_BLACK + DISP_BGND_LIGHT_GRAY);
+
+		sprintf(s,"%10d",OSTimeGet() / OS_TICKS_PER_SEC -1); // Display Start Time
+	PC_DispStr(15,10 + TaskOrder[OSPrioCur - PERIODIC_TASK_START_PRIO],s,DISP_FGND_BLACK + DISP_BGND_LIGHT_GRAY);
+
+		sprintf(s,"%10d",MyPtr->Deadline / OS_TICKS_PER_SEC -1); // Displau Deadline
+	PC_DispStr(39,10 + TaskOrder[OSPrioCur - PERIODIC_TASK_START_PRIO],s,DISP_FGND_BLACK + DISP_BGND_LIGHT_GRAY);
+		while(1)
+		{
+		  if(MyPtr->RemainTime<=0) {break;}
+		}
+
+		MyPtr->Deadline = MyPtr->Deadline + MyPtr->Period;
+		MyPtr->RemainTime = MyPtr->ExecutionTime;
+
+		sprintf(s,"%10d",OSTimeGet() / OS_TICKS_PER_SEC -1); // Displau End Time
+     	PC_DispStr(27,10 + TaskOrder[OSPrioCur - PERIODIC_TASK_START_PRIO],s,DISP_FGND_BLACK + DISP_BGND_LIGHT_GRAY);
+
+     	if(MyPtr->Deadline - MyPtr->Period>OSTimeGet()) {OSTimeDly(MyPtr->Deadline - MyPtr->Period - OSTimeGet());}
+	}
+
+}
