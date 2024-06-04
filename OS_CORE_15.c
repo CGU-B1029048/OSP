@@ -1,3 +1,4 @@
+鍵盤快速鍵更新 … Google 雲端硬碟將在 2024年8月1日 星期四更新鍵盤快速鍵，讓你透過首字母導覽功能找到所需項目。瞭解詳情
 /*
 *********************************************************************************************************
 *                                                uC/OS-II
@@ -26,9 +27,12 @@ typedef struct{
 	INT32U Period;
 	INT32U Deadline;
     INT8U TaskID;
+    INT8U TaskNum;
+    /*INT8U *OrderOfTask;*/
+
 }TASK_EXTRA_DATA;
 
-
+INT32U   count=0;
 /*
 *********************************************************************************************************
 *                              MAPPING TABLE TO MAP BIT POSITION TO BIT MASK
@@ -187,7 +191,7 @@ void  OSIntExit (void)
     OS_CPU_SR  cpu_sr;
 #endif
     
-    
+    char s[34];
     if (OSRunning == TRUE) {
         OS_ENTER_CRITICAL();
         if (OSIntNesting > 0) {                            /* Prevent OSIntNesting from wrapping       */
@@ -390,13 +394,13 @@ TASK_EXTRA_DATA *MyPtr;
     OSTime++;
     OS_EXIT_CRITICAL();
 #endif
-
+/*---------------------------------------------------*/
 	if((OSPrioCur >= PERIODIC_TASK_START_PRIO)&&(OSPrioCur <= PERIODIC_TASK_START_PRIO+7))
 	{
 		MyPtr = OSTCBCur->OSTCBExtPtr;
 		if(MyPtr->RemainTime>0) {MyPtr->RemainTime--;}
 	}
-
+/*---------------------------------------------------*/
 
 
     if (OSRunning == TRUE) {    
@@ -896,6 +900,7 @@ void  OS_Sched (void)
     OS_CPU_SR  cpu_sr;
 #endif    
     INT8U      y;
+    char s[34];
 
 
     OS_ENTER_CRITICAL();
@@ -906,6 +911,27 @@ void  OS_Sched (void)
             OSTCBHighRdy = OSTCBPrioTbl[OSPrioHighRdy];
             OSCtxSwCtr++;                              /* Increment context switch counter             */
             OS_TASK_SW();                              /* Perform a context switch                     */
+            /*
+            if(count == 0 && OSPrioCur >= 20 && OSPrioCur < 27)
+            {
+                TASK_EXTRA_DATA *MyPtr;
+                MyPtr = OSTCBCur -> OSTCBExtPtr;
+                count = MyPtr -> TaskNum*3;
+            }
+            if(OSPrioHighRdy >= 20 && OSPrioHighRdy<27 && OSPrioCur >= 20 && OSPrioCur<27)
+            {
+                TASK_EXTRA_DATA *MyPtr, *MyPtr1;
+                MyPtr = OSTCBCur -> OSTCBExtPtr;
+                MyPtr1 = OSTCBHighRdy -> OSTCBExtPtr;
+                sprintf(s,"%d->",MyPtr -> TaskID);
+                PC_DispStr(count, 15, s, DISP_FGND_BLACK + DISP_BGND_LIGHT_GRAY);
+                count = count + 3;
+                sprintf(s,"                                ");
+                PC_DispStr(0, 20, s, DISP_FGND_BLACK + DISP_BGND_LIGHT_GRAY);
+                sprintf(s,"switch at %10d",OSTimeGet());
+                PC_DispStr(0, 20, s, DISP_FGND_BLACK);
+            }
+            */
         }
     }
     OS_EXIT_CRITICAL();
